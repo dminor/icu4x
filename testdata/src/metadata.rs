@@ -1,42 +1,93 @@
-use cargo_metadata::MetadataCommand;
+use cargo_metadata::{self, MetadataCommand};
 use icu_locale::LanguageIdentifier;
 use serde::Deserialize;
+use std::fmt;
 use std::path::PathBuf;
+
+pub enum Error {
+    Cargo(cargo_metadata::Error),
+    SerdeJson(serde_json::Error),
+    PackageNotFound,
+    MetadataNotFound,
+}
+
+impl From<cargo_metadata::Error> for Error {
+    fn from(err: cargo_metadata::Error) -> Error {
+        Error::Cargo(err)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Error {
+        Error::SerdeJson(err)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Cargo(error) => write!(f, "Cargo Error: {}", error),
+            Error::SerdeJson(error) => write!(f, "Serde Error: {}", error),
+            Error::PackageNotFound => write!(f, "{}: package not found", env!("CARGO_PKG_NAME")),
+            Error::MetadataNotFound => write!(f, "package.metadata.icu4x_testdata not found"),
+        }
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (self as &dyn fmt::Display).fmt(f)
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct PackageMetadata {
     pub cldr_locales: Vec<LanguageIdentifier>,
-    pub cldr_core_ref: String,
-    pub cldr_dates_ref: String,
+    pub cldr_core: CldrDownloadInfo,
+    pub cldr_dates: CldrDownloadInfo,
 }
 
-pub fn load() -> PackageMetadata {
+#[derive(Debug, Deserialize)]
+pub struct CldrDownloadInfo {
+    pub pattern: String,
+    pub gitref: String,
+}
+
+#[derive(Debug)]
+pub struct PackageInfo {
+    target_directory: PathBuf,
+    package_metadata: PackageMetadata,
+}
+
+pub fn load() -> Result<PackageInfo, Error> {
     let metadata = MetadataCommand::new()
         .no_deps()
         .manifest_path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
-        .exec()
-        .unwrap();
+        .exec()?;
 
     let target_directory = metadata.target_directory;
 
-    let pkg = metadata
+    let mut icu_testdata_pkg = metadata
         .packages
-        .iter()
-        .filter(|x| x.name == "icu-testdata")
+        // into_iter() rather than iter() to take ownership of the result
+        .into_iter()
+        .filter(|x| x.name == env!("CARGO_PKG_NAME"))
         .next()
-        .unwrap();
-
-    println!("{:?}", pkg);
-    println!("{:?}", target_directory);
+        .ok_or(Error::PackageNotFound)?;
 
     let package_metadata: PackageMetadata = serde_json::from_value(
-        pkg.metadata
-            .as_object()
-            .unwrap()
-            .get("icu4x_testdata")
-            .unwrap()
-            .clone(),
-    )
-    .unwrap();
-    return package_metadata;
+        icu_testdata_pkg
+            .metadata
+            // Use mut functions so that we can call .take() at the end
+            .as_object_mut()
+            .ok_or(Error::MetadataNotFound)?
+            .get_mut("icu4x_testdata")
+            .ok_or(Error::MetadataNotFound)?
+            .take(),
+    )?;
+
+    Ok(PackageInfo {
+        target_directory,
+        package_metadata,
+    })
 }

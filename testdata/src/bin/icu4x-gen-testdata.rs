@@ -17,6 +17,7 @@ enum Error {
     Unsupported(&'static str),
     Export(icu_fs_data_provider::FsDataError),
     DataProvider(icu_data_provider::DataError),
+    Metadata(icu_testdata::metadata::Error),
 }
 
 impl fmt::Display for Error {
@@ -25,6 +26,7 @@ impl fmt::Display for Error {
             Error::Unsupported(message) => write!(f, "Unsupported: {}", message),
             Error::Export(error) => write!(f, "{}", error),
             Error::DataProvider(error) => write!(f, "{}", error),
+            Error::Metadata(error) => write!(f, "Metadata Error: {}", error),
         }
     }
 }
@@ -44,6 +46,12 @@ impl From<icu_fs_data_provider::FsDataError> for Error {
 impl From<icu_data_provider::DataError> for Error {
     fn from(err: icu_data_provider::DataError) -> Error {
         Error::DataProvider(err)
+    }
+}
+
+impl From<icu_testdata::metadata::Error> for Error {
+    fn from(err: icu_testdata::metadata::Error) -> Error {
+        Error::Metadata(err)
     }
 }
 
@@ -98,9 +106,9 @@ fn main() -> Result<(), Error> {
 
     println!("{:?}", matches);
 
-    let package_metadata = icu_testdata::metadata::load();
+    let metadata = icu_testdata::metadata::load()?;
 
-    println!("{:?}", package_metadata);
+    println!("{:?}", metadata);
 
     /*
     let output_path = PathBuf::from(

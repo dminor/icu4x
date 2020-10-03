@@ -14,7 +14,9 @@ include = [
     "README.md"
 ]
 
+# icu4x_testdata metadata: schema defined in ./src/metadata.rs
 [package.metadata.icu4x_testdata]
+
 # Locales to include in testdata. Keep this list somewhat short, but cover all features.
 cldr_locales = [
     # Belarusian:
@@ -54,11 +56,17 @@ cldr_locales = [
     "zh-Hant",
 ]
 
-# Git tag or sha1 for the CLDR data used to generate the testdata.
+# Git tag or sha1 for the CLDR data used to generate the testdata:
+
 # https://github.com/unicode-cldr/cldr-core/tags
-cldr_core_ref = "36.0.0"
+[package.metadata.icu4x_testdata.cldr_core]
+pattern = "https://github.com/unicode-cldr/cldr-core/archive/{}.zip"
+gitref = "36.0.0"
+
 # https://github.com/unicode-cldr/cldr-dates-modern/tags
-cldr_dates_ref = "36.0.0"
+[package.metadata.icu4x_testdata.cldr_dates]
+pattern = "https://github.com/unicode-cldr/cldr-dates-modern/archive/{}.zip"
+gitref = "36.0.0"
 
 [dependencies]
 icu-data-provider = { path = "../components/data-provider" }
