@@ -11,4 +11,5 @@ members = [
     "components/num-util",
     "components/pluralrules",
     "components/datetime",
+    "testdata",
 ]
